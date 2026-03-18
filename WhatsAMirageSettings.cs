@@ -39,17 +39,17 @@ public class ChestSettings
     public ColorNode GoldColor { get; set; } = new Color(255, 215, 0, 255);
     public RangeNode<int> WorldCircleRadius { get; set; } = new(60, 20, 150);
     public ToggleNode MinimapIcon { get; set; } = new(true);
-    public ToggleNode ShowTierLabel { get; set; } = new(true);
+    public ToggleNode ShowTierLabel { get; set; } = new(false);
 }
 
 [Submenu(CollapsedByDefault = true)]
 public class MonsterSettings
 {
-    public ToggleNode Show { get; set; } = new(true);
+    public ToggleNode Show { get; set; } = new(false);
     public ColorNode RareLeaderColor { get; set; } = Color.Orange;
     public ColorNode InvulnerableColor { get; set; } = Color.Gray;
-    public ToggleNode PackCountOverlay { get; set; } = new(true);
-    public ToggleNode MinimapIcon { get; set; } = new(true);
+    public ToggleNode PackCountOverlay { get; set; } = new(false);
+    public ToggleNode MinimapIcon { get; set; } = new(false);
 }
 
 [Submenu(CollapsedByDefault = true)]
@@ -60,7 +60,7 @@ public class ChainAnchorSettings
     public RangeNode<int> PathThickness { get; set; } = new(2, 1, 5);
     public RangeNode<int> DrawEveryNthSegment { get; set; } = new(3, 1, 10);
     public ToggleNode ShowOnMinimap { get; set; } = new(true);
-    public ToggleNode ShowWorldCircle { get; set; } = new(true);
+    public ToggleNode ShowWorldCircle { get; set; } = new(false);
     public RangeNode<int> WorldCircleRadius { get; set; } = new(100, 30, 300);
     public ToggleNode FallbackArrow { get; set; } = new(true);
 }

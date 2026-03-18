@@ -392,7 +392,13 @@ public sealed class MirageSettingsUi
         DrawTierLegendItem(dl, x, ref y, WishTierB, "B - Situational", "Build/strategy dependent");
         DrawTierLegendItem(dl, x, ref y, WishTierC, "C - Chain Break", "Fixed reward from chain completion");
         DrawTierLegendItem(dl, x, ref y, WishTierD, "D - Skip", "No meaningful value");
-        DrawTierLegendItem(dl, x, ref y, MirageGold, "* Flagged", "Your priority picks  - highlighted in-game");
+        {
+            DrawStar(dl, new Vector2(x + 8, y + 7), 6f, MirageGold, true);
+            dl.AddText(new Vector2(x + 20, y), Label, "Flagged");
+            float nameW = ImGui.CalcTextSize("Flagged").X;
+            dl.AddText(new Vector2(x + 24 + nameW, y), Desc, "- Click row to add/remove from watchlist");
+            y += 18f;
+        }
         y += 4f;
 
         // Wish tier reference list from wish-tiers.json
@@ -436,7 +442,8 @@ public sealed class MirageSettingsUi
 
         if (flaggedCount > 0)
         {
-            dl.AddText(new Vector2(x + 6, y), MirageGold, $"* {flaggedCount} wish{(flaggedCount == 1 ? "" : "es")} flagged");
+            DrawStar(dl, new Vector2(x + 12, y + 7), 5f, MirageGold, true);
+            dl.AddText(new Vector2(x + 22, y), MirageGold, $"{flaggedCount} wish{(flaggedCount == 1 ? "" : "es")} flagged");
             y += 18f;
         }
 
@@ -483,48 +490,51 @@ public sealed class MirageSettingsUi
                 var wish = kv.Value;
                 var isFlagged = _isWishFlagged?.Invoke(kv.Key) == true;
                 float rowStartY = y;
+                float rowMinX = x + 2;
+                float rowMaxX = x + cardW - 24;
 
-                // Flag star button (clickable)
-                {
-                    var starPos = new Vector2(x + 4, y + 1);
-                    ImGui.SetCursorScreenPos(starPos);
-                    ImGui.PushStyleColor(ImGuiCol.Button, new System.Numerics.Vector4(0, 0, 0, 0));
-                    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new System.Numerics.Vector4(0.2f, 0.2f, 0.1f, 0.5f));
-                    ImGui.PushStyleColor(ImGuiCol.ButtonActive, new System.Numerics.Vector4(0.3f, 0.3f, 0.1f, 0.5f));
-                    if (ImGui.SmallButton($"{(isFlagged ? "*" : "o")}##flag_{kv.Key}"))
-                        _toggleWishFlag?.Invoke(kv.Key);
-                    ImGui.PopStyleColor(3);
-                }
+                // Star icon
+                DrawStar(dl, new Vector2(x + 12, y + 7), 5f,
+                    isFlagged ? MirageGold : WithAlpha(Label, 0.25f), isFlagged);
 
-                // Name (shifted right for star)
-                dl.AddText(new Vector2(x + 22, y), isFlagged ? MirageGold : Label, kv.Key);
+                // Name
+                dl.AddText(new Vector2(x + 24, y), isFlagged ? MirageGold : Label, kv.Key);
                 y += 15f;
 
                 // Effect
                 if (!string.IsNullOrEmpty(wish.Effect))
                 {
-                    dl.AddText(new Vector2(x + 26, y), Desc, wish.Effect);
+                    dl.AddText(new Vector2(x + 28, y), Desc, wish.Effect);
                     y += 15f;
                 }
 
                 // Notes
                 if (!string.IsNullOrEmpty(wish.Notes))
                 {
-                    dl.AddText(new Vector2(x + 26, y), WithAlpha(tierCol, 0.7f), wish.Notes);
+                    dl.AddText(new Vector2(x + 28, y), WithAlpha(tierCol, 0.7f), wish.Notes);
                     y += 15f;
                 }
+
+                // Full-row invisible button for click + hover
+                var rowMin = new Vector2(rowMinX, rowStartY - 2);
+                var rowMax = new Vector2(rowMaxX, y + 2);
+                var rowSize = rowMax - rowMin;
+                ImGui.SetCursorScreenPos(rowMin);
+                ImGui.InvisibleButton($"##wish_row_{kv.Key}", rowSize);
+
+                if (ImGui.IsItemHovered())
+                {
+                    dl.AddRectFilled(rowMin, rowMax, WithAlpha(Accent, 0.08f), 3f);
+                    ImGui.SetMouseCursor(ImGuiMouseCursor.Hand);
+                }
+                if (ImGui.IsItemClicked())
+                    _toggleWishFlag?.Invoke(kv.Key);
 
                 // Flagged row highlight
                 if (isFlagged)
                 {
-                    dl.AddRectFilled(
-                        new Vector2(x + 2, rowStartY - 2),
-                        new Vector2(x + cardW - 24, y + 2),
-                        WithAlpha(MirageGold, 0.06f), 3f);
-                    dl.AddRect(
-                        new Vector2(x + 2, rowStartY - 2),
-                        new Vector2(x + cardW - 24, y + 2),
-                        WithAlpha(MirageGold, 0.15f), 3f, ImDrawFlags.None, 1f);
+                    dl.AddRectFilled(rowMin, rowMax, WithAlpha(MirageGold, 0.06f), 3f);
+                    dl.AddRect(rowMin, rowMax, WithAlpha(MirageGold, 0.15f), 3f, ImDrawFlags.None, 1f);
                 }
 
                 y += 2f;
@@ -590,6 +600,47 @@ public sealed class MirageSettingsUi
         float nameW = ImGui.CalcTextSize(name).X;
         dl.AddText(new Vector2(x + 24 + nameW, y), Desc, $"- {desc}");
         y += 18f;
+    }
+
+    private static void DrawStar(ImDrawListPtr dl, Vector2 center, float radius, uint color, bool filled)
+    {
+        const int points = 5;
+        const float innerRatio = 0.38f;
+        float outerR = radius;
+        float innerR = radius * innerRatio;
+        float startAngle = -MathF.PI / 2f; // point up
+
+        if (filled)
+        {
+            // Triangle fan from center
+            for (int i = 0; i < points; i++)
+            {
+                float a0 = startAngle + i * 2f * MathF.PI / points;
+                float a1 = a0 + MathF.PI / points;
+                float a2 = a0 + 2f * MathF.PI / points;
+
+                var outer0 = center + new Vector2(MathF.Cos(a0) * outerR, MathF.Sin(a0) * outerR);
+                var inner  = center + new Vector2(MathF.Cos(a1) * innerR, MathF.Sin(a1) * innerR);
+                var outer1 = center + new Vector2(MathF.Cos(a2) * outerR, MathF.Sin(a2) * outerR);
+
+                dl.AddTriangleFilled(center, outer0, inner, color);
+                dl.AddTriangleFilled(center, inner, outer1, color);
+            }
+        }
+        else
+        {
+            // Line segments connecting outer/inner points
+            var verts = new Vector2[points * 2];
+            for (int i = 0; i < points; i++)
+            {
+                float aOuter = startAngle + i * 2f * MathF.PI / points;
+                float aInner = aOuter + MathF.PI / points;
+                verts[i * 2]     = center + new Vector2(MathF.Cos(aOuter) * outerR, MathF.Sin(aOuter) * outerR);
+                verts[i * 2 + 1] = center + new Vector2(MathF.Cos(aInner) * innerR, MathF.Sin(aInner) * innerR);
+            }
+            for (int i = 0; i < verts.Length; i++)
+                dl.AddLine(verts[i], verts[(i + 1) % verts.Length], color, 1f);
+        }
     }
 
     private static void DrawBridgeStatus(ImDrawListPtr dl, float x, ref float y, bool available)
