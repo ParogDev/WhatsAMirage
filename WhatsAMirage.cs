@@ -37,7 +37,7 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
 
     // Wish panel state
     private bool _wishPanelVisible;
-    private List<Element> _cachedWishElements;
+    private List<(Element Card, Element Name)> _cachedWishElements;
     private readonly HashSet<string> _loggedUnknownWishes = new();
 
     // Flagged wishes (persisted to config dir)
@@ -380,7 +380,7 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
                 var miragePanel = GameController.Game.IngameState.IngameUi.MirageWishesPanel;
                 if (miragePanel?.IsVisible == true && miragePanel.Children.Count > 4)
                 {
-                    _cachedWishElements ??= new List<Element>();
+                    _cachedWishElements ??= new List<(Element, Element)>();
                     var container = miragePanel.Children[4];
                     foreach (var index in new[] { 3, 4, 5 })
                     {
@@ -388,17 +388,17 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
                         var card = container.Children[index];
                         var nameElem = FindWishNameElement(card);
                         if (nameElem != null)
-                            _cachedWishElements.Add(nameElem);
+                            _cachedWishElements.Add((card, nameElem));
                     }
                     _wishPanelVisible = _cachedWishElements.Count > 0;
 
                     // Log unknown wishes (once per name)
                     if (_wishTiers?.Tiers != null)
                     {
-                        foreach (var elem in _cachedWishElements)
+                        foreach (var (_, name) in _cachedWishElements)
                         {
-                            if (elem.Text != null && !_wishTiers.Tiers.ContainsKey(elem.Text) && _loggedUnknownWishes.Add(elem.Text))
-                                LogMsg($"Unknown wish discovered: \"{elem.Text}\"  - add to wish-tiers.json or run /update-wish-tiers");
+                            if (name.Text != null && !_wishTiers.Tiers.ContainsKey(name.Text) && _loggedUnknownWishes.Add(name.Text))
+                                LogMsg($"Unknown wish discovered: \"{name.Text}\"  - add to wish-tiers.json or run /update-wish-tiers");
                         }
                     }
                 }
@@ -721,14 +721,14 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
         var flagHighlight = Settings.WishAlert.HighlightFlaggedWishes.Value;
         var flagColor = Settings.WishAlert.FlaggedWishColor.Value;
 
-        foreach (var elem in _cachedWishElements)
+        foreach (var (card, nameElem) in _cachedWishElements)
         {
-            var wishName = elem.Text;
+            var wishName = nameElem.Text;
             WishTierEntry wishData = null;
             _wishTiers?.Tiers?.TryGetValue(wishName, out wishData);
 
-            var rect = elem.GetClientRectCache;
-            if (rect.Width <= 0 || rect.Height <= 0) continue;
+            var cardRect = card.GetClientRectCache;
+            if (cardRect.Width <= 0 || cardRect.Height <= 0) continue;
 
             var tierText = wishData?.Tier ?? "?";
             var tierColor = TierColors.GetValueOrDefault(tierText, new Color(128, 128, 128));
@@ -740,21 +740,21 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
                 var pulse = (float)(0.5 + 0.5 * Math.Sin(Environment.TickCount64 / 300.0));
                 var glowAlpha = (byte)(100 + (int)(100 * pulse));
                 var glowColor = new Color(flagColor.R, flagColor.G, flagColor.B, glowAlpha);
-                var cardMin = new Vector2(rect.X - 3, rect.Y - 3);
-                var cardMax = new Vector2(rect.X + rect.Width + 3, rect.Y + rect.Height + 3);
+                var cardMin = new Vector2(cardRect.X - 3, cardRect.Y - 3);
+                var cardMax = new Vector2(cardRect.X + cardRect.Width + 3, cardRect.Y + cardRect.Height + 3);
                 Graphics.DrawFrame(cardMin, cardMax, glowColor, 3);
                 Graphics.DrawBox(cardMin, cardMax, new Color(flagColor.R, flagColor.G, flagColor.B, (byte)(30 + (int)(20 * pulse))));
             }
 
-            // Large tier badge, right-aligned inside the wish name bar
+            // Large tier badge, bottom-right of card
             var scale = isFlagged ? 2.2f : 1.8f;
             using (Graphics.SetTextScale(scale))
             {
                 var textSize = Graphics.MeasureText(tierText);
                 var padding = new Vector2(10, 6);
                 var badgeCenter = new Vector2(
-                    rect.X + rect.Width - textSize.X / 2 - padding.X - 8,
-                    rect.Y + rect.Height / 2);
+                    cardRect.X + cardRect.Width - textSize.X / 2 - padding.X - 8,
+                    cardRect.Y + cardRect.Height - textSize.Y / 2 - padding.Y - 8);
 
                 var pillMin = badgeCenter - textSize / 2 - padding;
                 var pillMax = badgeCenter + textSize / 2 + padding;
@@ -774,8 +774,8 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
                 {
                     var pickSize = Graphics.MeasureText("PICK");
                     var pickPos = new Vector2(
-                        rect.X + rect.Width - pickSize.X / 2 - 18,
-                        rect.Y + 4);
+                        cardRect.X + cardRect.Width - pickSize.X / 2 - 18,
+                        cardRect.Y + 4);
                     Graphics.DrawTextWithBackground("PICK", pickPos, flagColor, FontAlign.Center, new Color(10, 10, 15, 200));
                 }
             }
@@ -785,9 +785,9 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
         if (Settings.WishAlert.ShowWishTooltip)
         {
             var mousePos = Input.MousePositionNum;
-            foreach (var elem in _cachedWishElements)
+            foreach (var (card, nameElem) in _cachedWishElements)
             {
-                var rect = elem.GetClientRectCache;
+                var rect = card.GetClientRectCache;
                 if (rect.Width <= 0) continue;
 
                 // Hit test
@@ -795,7 +795,7 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
                     mousePos.Y < rect.Y || mousePos.Y > rect.Y + rect.Height)
                     continue;
 
-                var wishName = elem.Text;
+                var wishName = nameElem.Text;
                 WishTierEntry wishData = null;
                 _wishTiers?.Tiers?.TryGetValue(wishName, out wishData);
 
