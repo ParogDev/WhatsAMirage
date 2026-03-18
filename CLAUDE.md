@@ -10,16 +10,24 @@ WhatsAMirage is an overlay plugin for the Mirage (Faridun/Zarokh) league mechani
 
 ### Architecture
 
-Entity tracking via `EntityAdded` filters by metadata path (Faridun/ZarokhSpawner, Chests/Faridun, FaridunLeague, FaridunAstralChainAnchor). `Tick()` updates spawner activation state (StateMachine "activated"), chest open state, monster rare/invulnerable flags, chain anchor path requests (via Radar PluginBridge), and arrow target selection. `Render()` draws world circles, minimap dots, tier labels, pack counts, path lines, and direction arrows. `DrawSettings()` delegates to `MirageSettingsUi` for a custom tabbed ImGui panel.
+Entity tracking via `EntityAdded` filters by metadata path (Faridun/ZarokhSpawner, Chests/Faridun, FaridunLeague, FaridunAstralChainAnchor). `Tick()` updates spawner activation state (StateMachine "activated"), chest open state, monster rare/invulnerable flags, chain anchor path requests (via Radar PluginBridge), arrow target selection, and wish panel detection via `MirageWishesPanel`. `Render()` draws world circles, minimap dots, tier labels, pack counts, path lines, direction arrows, and wish tier overlays. `DrawSettings()` delegates to `MirageSettingsUi` for a custom tabbed ImGui panel.
+
+### Wish System Architecture
+
+- **Panel detection**: Uses `IngameUi.MirageWishesPanel` (dedicated property, same as WishHelper) instead of PopUpWindow traversal
+- **Wish discovery**: Runtime text-based matching via `FindWishNameElement()` recursive search within card elements at `MirageWishesPanel.Children[4].Children[3,4,5]`
+- **Tier data**: `data/wish-tiers.json` — PoEDB-seeded, manually curated tier ratings. Run `/update-wish-tiers` to sync from PoEDB
+- **Flagged wishes**: User-flagged priority picks persisted to `ConfigDirectory/flagged-wishes.json`, highlighted with pulsing glow + "PICK" label in overlay
+- **Unknown wishes**: Logged once per name when discovered at runtime but not in wish-tiers.json
 
 ### Lifecycle Methods Used
 
 | Method | Purpose |
 |---|---|
-| `AreaChange` | Clears all entity dictionaries, cancels path CTS, reloads terrain height data |
+| `AreaChange` | Clears all entity dictionaries, cancels path CTS, reloads terrain height + wish tiers |
 | `EntityAdded` | Filters entities by path and populates spawner/chest/monster/anchor dictionaries |
-| `Tick` | Updates entity state, requests Radar paths, resolves arrow target, caches minimap state |
-| `Render` | Draws world circles, minimap icons, tier labels, pack counts, path lines, direction arrows |
+| `Tick` | Updates entity state, requests Radar paths, resolves arrow target, detects wish panel, caches minimap state |
+| `Render` | Draws world circles, minimap icons, tier labels, pack counts, path lines, direction arrows, wish tier overlays |
 | `DrawSettings` | Custom tabbed settings UI via MirageSettingsUi |
 
 ### Current Settings
@@ -60,6 +68,12 @@ Entity tracking via `EntityAdded` filters by metadata path (Faridun/ZarokhSpawne
 | Arrow.DistanceFromCenter | RangeNode\<int\> | 120 (60-300) | ArrowSettings |
 | Arrow.MaxRange | RangeNode\<int\> | 500 (100-2000) | ArrowSettings |
 | General.MaxDrawDistance | RangeNode\<int\> | 200 (50-500) | GeneralSettings |
+| WishAlert.ShowAlert | ToggleNode | true | WishAlertSettings |
+| WishAlert.AlertColor | ColorNode | Gold (255,215,0) | WishAlertSettings |
+| WishAlert.ShowWishTierOverlay | ToggleNode | true | WishAlertSettings |
+| WishAlert.ShowWishTooltip | ToggleNode | true | WishAlertSettings |
+| WishAlert.HighlightFlaggedWishes | ToggleNode | true | WishAlertSettings |
+| WishAlert.FlaggedWishColor | ColorNode | Gold (255,215,0) | WishAlertSettings |
 
 ## Project Setup
 

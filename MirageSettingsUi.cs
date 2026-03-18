@@ -18,7 +18,7 @@ public record MirageUiState(
     bool RadarAvailable,
     bool IsMirageZone,
     VarashtaData Varashta,
-    MirageKnowledgeBase KnowledgeBase
+    WishTierFile WishTiers
 );
 
 /// <summary>
@@ -64,10 +64,18 @@ public sealed class MirageSettingsUi
     // ── Entry point ─────────────────────────────────────────────────
 
     private Action _refreshKnowledgeBase;
+    private Func<string, bool> _isWishFlagged;
+    private Action<string> _toggleWishFlag;
+    private string _wishSearchFilter = "";
 
-    public void Draw(WhatsAMirageSettings s, MirageUiState state, Action refreshKnowledgeBase = null)
+    public void Draw(WhatsAMirageSettings s, MirageUiState state,
+        Action refreshKnowledgeBase = null,
+        Func<string, bool> isWishFlagged = null,
+        Action<string> toggleWishFlag = null)
     {
         _refreshKnowledgeBase = refreshKnowledgeBase;
+        _isWishFlagged = isWishFlagged;
+        _toggleWishFlag = toggleWishFlag;
         var contentMin = ImGui.GetCursorScreenPos();
         float contentW = ImGui.GetContentRegionAvail().X;
         var dl = ImGui.GetWindowDrawList();
@@ -371,6 +379,12 @@ public sealed class MirageSettingsUi
         Toggle("mr_wa_tip", s.WishAlert.ShowWishTooltip, dl, x, cx, ref y,
             "Show Tooltip", "Show details on hover over wish cards");
 
+        SectionHeader(dl, x, ref y, "Flagged Wishes");
+        Toggle("mr_wa_flag", s.WishAlert.HighlightFlaggedWishes, dl, x, cx, ref y,
+            "Highlight Flagged", "Pulsing glow + PICK label on flagged wishes in-game");
+        ColorPicker("mr_wa_fcol", s.WishAlert.FlaggedWishColor, dl, x, cx, ref y,
+            "Flag Color", "Highlight color for flagged wishes");
+
         // Quick legend
         SectionHeader(dl, x, ref y, "Quick Legend");
         DrawTierLegendItem(dl, x, ref y, WishTierS, "S - Always take", "Highest value wishes");
@@ -378,38 +392,84 @@ public sealed class MirageSettingsUi
         DrawTierLegendItem(dl, x, ref y, WishTierB, "B - Situational", "Build/strategy dependent");
         DrawTierLegendItem(dl, x, ref y, WishTierC, "C - Chain Break", "Fixed reward from chain completion");
         DrawTierLegendItem(dl, x, ref y, WishTierD, "D - Skip", "No meaningful value");
+        DrawTierLegendItem(dl, x, ref y, MirageGold, "* Flagged", "Your priority picks  - highlighted in-game");
         y += 4f;
 
-        // Wish tier reference list from knowledge base
-        // Refresh button
+        // Wish tier reference list from wish-tiers.json
+        // Toolbar: Refresh + Search
         {
             ImGui.SetCursorScreenPos(new Vector2(x + 6, y));
-            if (ImGui.Button("Refresh Knowledge Base"))
+            if (ImGui.Button("Refresh Wish Tiers"))
                 _refreshKnowledgeBase?.Invoke();
-            HelpMarker("Reload wish tier data from the knowledge base JSON file.");
+            HelpMarker("Reload wish tier data from wish-tiers.json. Run /update-wish-tiers to sync from PoEDB.");
+            y += 28f;
+
+            // Search filter
+            ImGui.SetCursorScreenPos(new Vector2(x + 6, y));
+            ImGui.PushStyleColor(ImGuiCol.FrameBg, new System.Numerics.Vector4(0.07f, 0.07f, 0.09f, 1f));
+            ImGui.PushStyleColor(ImGuiCol.Border, new System.Numerics.Vector4(0.55f, 0.42f, 0.06f, 0.4f));
+            ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4f);
+            ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 1f);
+            ImGui.SetNextItemWidth(cardW - 36);
+            ImGui.InputTextWithHint("##mr_wish_search", "Search wishes...", ref _wishSearchFilter, 128);
+            ImGui.PopStyleVar(2);
+            ImGui.PopStyleColor(2);
             y += 28f;
         }
 
-        var kb = state.KnowledgeBase;
-        if (kb?.Wishes == null || kb.Wishes.Count == 0)
+        var kb = state.WishTiers;
+        if (kb?.Tiers == null || kb.Tiers.Count == 0)
         {
-            dl.AddText(new Vector2(x + 6, y), StatusDim, "Knowledge base not loaded. Click Refresh above.");
+            dl.AddText(new Vector2(x + 6, y), StatusDim, "Wish tiers not loaded. Click Refresh above.");
             y += 20f;
             return;
         }
 
+        var hasSearch = !string.IsNullOrWhiteSpace(_wishSearchFilter);
+        var searchLower = _wishSearchFilter?.ToLowerInvariant() ?? "";
+
+        // Count flagged
+        int flaggedCount = 0;
+        if (_isWishFlagged != null)
+            foreach (var kv in kb.Tiers)
+                if (_isWishFlagged(kv.Key)) flaggedCount++;
+
+        if (flaggedCount > 0)
+        {
+            dl.AddText(new Vector2(x + 6, y), MirageGold, $"* {flaggedCount} wish{(flaggedCount == 1 ? "" : "es")} flagged");
+            y += 18f;
+        }
+
         SectionHeader(dl, x, ref y, "Wish Tier Reference");
 
-        // Group by tier
-        var tiers = new[] { "S", "A", "B", "C", "D" };
-        foreach (var tier in tiers)
+        // Group by tier  - show flagged first if not searching
+        var tierOrder = new[] { "S", "A", "B", "C", "D", "?" };
+        foreach (var tier in tierOrder)
         {
-            var wishes = new List<KeyValuePair<string, WishData>>();
-            foreach (var kv in kb.Wishes)
-                if (kv.Value.Tier == tier)
-                    wishes.Add(kv);
+            var wishes = new List<KeyValuePair<string, WishTierEntry>>();
+            foreach (var kv in kb.Tiers)
+            {
+                if (kv.Value.Tier != tier) continue;
+                if (hasSearch)
+                {
+                    var matchName = kv.Key.ToLowerInvariant().Contains(searchLower);
+                    var matchEffect = kv.Value.Effect?.ToLowerInvariant().Contains(searchLower) == true;
+                    var matchNotes = kv.Value.Notes?.ToLowerInvariant().Contains(searchLower) == true;
+                    if (!matchName && !matchEffect && !matchNotes) continue;
+                }
+                wishes.Add(kv);
+            }
 
             if (wishes.Count == 0) continue;
+
+            // Sort: flagged first within each tier
+            if (_isWishFlagged != null)
+                wishes.Sort((a, b) =>
+                {
+                    var af = _isWishFlagged(a.Key) ? 0 : 1;
+                    var bf = _isWishFlagged(b.Key) ? 0 : 1;
+                    return af.CompareTo(bf);
+                });
 
             uint tierCol = GetWishTierColor(tier);
 
@@ -421,20 +481,50 @@ public sealed class MirageSettingsUi
             foreach (var kv in wishes)
             {
                 var wish = kv.Value;
-                // Name
-                dl.AddCircleFilled(new Vector2(x + 10, y + 7), 3f, tierCol);
-                dl.AddText(new Vector2(x + 18, y), Label, kv.Key);
+                var isFlagged = _isWishFlagged?.Invoke(kv.Key) == true;
+                float rowStartY = y;
+
+                // Flag star button (clickable)
+                {
+                    var starPos = new Vector2(x + 4, y + 1);
+                    ImGui.SetCursorScreenPos(starPos);
+                    ImGui.PushStyleColor(ImGuiCol.Button, new System.Numerics.Vector4(0, 0, 0, 0));
+                    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new System.Numerics.Vector4(0.2f, 0.2f, 0.1f, 0.5f));
+                    ImGui.PushStyleColor(ImGuiCol.ButtonActive, new System.Numerics.Vector4(0.3f, 0.3f, 0.1f, 0.5f));
+                    if (ImGui.SmallButton($"{(isFlagged ? "*" : "o")}##flag_{kv.Key}"))
+                        _toggleWishFlag?.Invoke(kv.Key);
+                    ImGui.PopStyleColor(3);
+                }
+
+                // Name (shifted right for star)
+                dl.AddText(new Vector2(x + 22, y), isFlagged ? MirageGold : Label, kv.Key);
                 y += 15f;
 
-                // Effect + category
-                dl.AddText(new Vector2(x + 22, y), Desc, $"{wish.Effect}  [{wish.Category}]");
-                y += 15f;
+                // Effect
+                if (!string.IsNullOrEmpty(wish.Effect))
+                {
+                    dl.AddText(new Vector2(x + 26, y), Desc, wish.Effect);
+                    y += 15f;
+                }
 
                 // Notes
                 if (!string.IsNullOrEmpty(wish.Notes))
                 {
-                    dl.AddText(new Vector2(x + 22, y), WithAlpha(tierCol, 0.7f), wish.Notes);
+                    dl.AddText(new Vector2(x + 26, y), WithAlpha(tierCol, 0.7f), wish.Notes);
                     y += 15f;
+                }
+
+                // Flagged row highlight
+                if (isFlagged)
+                {
+                    dl.AddRectFilled(
+                        new Vector2(x + 2, rowStartY - 2),
+                        new Vector2(x + cardW - 24, y + 2),
+                        WithAlpha(MirageGold, 0.06f), 3f);
+                    dl.AddRect(
+                        new Vector2(x + 2, rowStartY - 2),
+                        new Vector2(x + cardW - 24, y + 2),
+                        WithAlpha(MirageGold, 0.15f), 3f, ImDrawFlags.None, 1f);
                 }
 
                 y += 2f;
@@ -444,7 +534,7 @@ public sealed class MirageSettingsUi
 
         // Version info
         y += 4f;
-        dl.AddText(new Vector2(x + 6, y), Desc, $"v{kb.Version} - {kb.LastUpdated} - {kb.Status}");
+        dl.AddText(new Vector2(x + 6, y), Desc, $"v{kb.Version}  - {kb.LastUpdated}  - {kb.Source ?? "manual"}  ({kb.Tiers.Count} wishes)");
         y += 18f;
     }
 

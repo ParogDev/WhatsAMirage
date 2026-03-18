@@ -30,7 +30,7 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
     private VarashtaData _varashta;
     private bool _isMirageZone;
 
-    private MirageKnowledgeBase _knowledgeBase;
+    private WishTierFile _wishTiers;
 
     private MirageSpawnerData _arrowTarget;
     private MirageSettingsUi _settingsUi;
@@ -38,6 +38,11 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
     // Wish panel state
     private bool _wishPanelVisible;
     private List<Element> _cachedWishElements;
+    private readonly HashSet<string> _loggedUnknownWishes = new();
+
+    // Flagged wishes (persisted to config dir)
+    private HashSet<string> _flaggedWishes = new();
+    private string _flaggedWishesPath;
 
     // Radar pathfinding bridge
     private Func<Vector2, Action<List<Vector2i>>, CancellationToken, System.Threading.Tasks.Task> _radarLookForRoute;
@@ -58,29 +63,53 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
 
     public override bool Initialise()
     {
-        LoadKnowledgeBase();
+        LoadWishTiers();
+        _flaggedWishesPath = Path.Combine(ConfigDirectory, "flagged-wishes.json");
+        LoadFlaggedWishes();
         return true;
     }
 
-    private void LoadKnowledgeBase()
+    private void LoadFlaggedWishes()
     {
         try
         {
-            // DirectoryFullName = DLL's directory. The csproj copies data/ to output.
-            // Also check source root as fallback (walk up from assembly location).
+            if (File.Exists(_flaggedWishesPath))
+                _flaggedWishes = JsonConvert.DeserializeObject<HashSet<string>>(File.ReadAllText(_flaggedWishesPath)) ?? new();
+        }
+        catch { _flaggedWishes = new(); }
+    }
+
+    private void SaveFlaggedWishes()
+    {
+        try { File.WriteAllText(_flaggedWishesPath, JsonConvert.SerializeObject(_flaggedWishes.OrderBy(x => x).ToList(), Formatting.Indented)); }
+        catch (Exception ex) { LogError($"Failed to save flagged wishes: {ex.Message}"); }
+    }
+
+    public bool IsWishFlagged(string wishName) => _flaggedWishes.Contains(wishName);
+
+    public void ToggleWishFlag(string wishName)
+    {
+        if (!_flaggedWishes.Remove(wishName))
+            _flaggedWishes.Add(wishName);
+        SaveFlaggedWishes();
+    }
+
+    private void LoadWishTiers()
+    {
+        try
+        {
             var asmDir = Path.GetDirectoryName(GetType().Assembly.Location) ?? DirectoryFullName;
             var candidates = new List<string>
             {
-                Path.Combine(DirectoryFullName, "data", "mirage-knowledge.json"),
-                Path.Combine(asmDir, "data", "mirage-knowledge.json"),
+                Path.Combine(DirectoryFullName, "data", "wish-tiers.json"),
+                Path.Combine(asmDir, "data", "wish-tiers.json"),
             };
-            // Walk up from assembly dir looking for source root with data/
             var dir = asmDir;
             for (int i = 0; i < 6 && dir != null; i++)
             {
                 dir = Path.GetDirectoryName(dir);
                 if (dir != null)
-                    candidates.Add(Path.Combine(dir, "data", "mirage-knowledge.json"));
+                    candidates.Add(Path.Combine(dir, "data", "wish-tiers.json"));
             }
 
             foreach (var candidate in candidates)
@@ -88,23 +117,23 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
                 var full = Path.GetFullPath(candidate);
                 if (File.Exists(full))
                 {
-                    _knowledgeBase = JsonConvert.DeserializeObject<MirageKnowledgeBase>(File.ReadAllText(full));
-                    LogMsg($"Loaded mirage knowledge base from {full}");
+                    _wishTiers = JsonConvert.DeserializeObject<WishTierFile>(File.ReadAllText(full));
+                    LogMsg($"Loaded wish tiers v{_wishTiers?.Version} ({_wishTiers?.Tiers?.Count ?? 0} wishes) from {full}");
                     return;
                 }
             }
 
-            LogError("mirage-knowledge.json not found in any expected location");
+            LogError("wish-tiers.json not found in any expected location");
         }
         catch (Exception ex)
         {
-            LogError($"Failed to load mirage knowledge base: {ex.Message}");
+            LogError($"Failed to load wish tiers: {ex.Message}");
         }
     }
 
-    public void RefreshKnowledgeBase()
+    public void RefreshWishTiers()
     {
-        LoadKnowledgeBase();
+        LoadWishTiers();
     }
 
     public override void AreaChange(AreaInstance area)
@@ -118,6 +147,7 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
         _isMirageZone = false;
         _arrowTarget = null;
         _cachedWishElements?.Clear();
+        _loggedUnknownWishes.Clear();
 
         foreach (var anchor in _chainAnchors.Values)
             anchor.PathCts?.Cancel();
@@ -125,7 +155,7 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
         _radarChecked = false;
         _heightData = GameController.IngameState.Data.RawTerrainHeightData;
 
-        LoadKnowledgeBase();
+        LoadWishTiers();
     }
 
     public override void EntityAdded(Entity entity)
@@ -201,12 +231,12 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
             _radarChecked = true;
         }
 
-        // Update chain anchors — don't remove on invalid, entity may return in range
+        // Update chain anchors  - don't remove on invalid, entity may return in range
         foreach (var (id, data) in _chainAnchors)
         {
             if (!data.Entity.IsValid)
             {
-                // Out of range — cancel path to save resources, but keep tracking
+                // Out of range  - cancel path to save resources, but keep tracking
                 if (data.PathCts != null)
                 {
                     data.PathCts.Cancel();
@@ -216,13 +246,13 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
             }
             else if (data.Path == null && data.PathCts == null && _radarLookForRoute != null)
             {
-                // Back in range (or newly available) — re-request path
+                // Back in range (or newly available)  - re-request path
                 RequestPathForAnchor(data);
             }
         }
 
-        // Update spawners — check StateMachine.activated to detect triggered state
-        // Don't remove on invalid — entity may return in range; keep tracking for arrow
+        // Update spawners  - check StateMachine.activated to detect triggered state
+        // Don't remove on invalid  - entity may return in range; keep tracking for arrow
         foreach (var (id, data) in _spawners)
         {
             if (!data.Entity.IsValid) continue;
@@ -340,6 +370,42 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
                 _arrowTarget = null;
         }
 
+        // Detect wish panel via MirageWishesPanel (moved from Render for performance)
+        _wishPanelVisible = false;
+        _cachedWishElements?.Clear();
+        if (Settings.WishAlert.ShowWishTierOverlay)
+        {
+            try
+            {
+                var miragePanel = GameController.Game.IngameState.IngameUi.MirageWishesPanel;
+                if (miragePanel?.IsVisible == true && miragePanel.Children.Count > 4)
+                {
+                    _cachedWishElements ??= new List<Element>();
+                    var container = miragePanel.Children[4];
+                    foreach (var index in new[] { 3, 4, 5 })
+                    {
+                        if (container.Children.Count <= index) continue;
+                        var card = container.Children[index];
+                        var nameElem = FindWishNameElement(card);
+                        if (nameElem != null)
+                            _cachedWishElements.Add(nameElem);
+                    }
+                    _wishPanelVisible = _cachedWishElements.Count > 0;
+
+                    // Log unknown wishes (once per name)
+                    if (_wishTiers?.Tiers != null)
+                    {
+                        foreach (var elem in _cachedWishElements)
+                        {
+                            if (elem.Text != null && !_wishTiers.Tiers.ContainsKey(elem.Text) && _loggedUnknownWishes.Add(elem.Text))
+                                LogMsg($"Unknown wish discovered: \"{elem.Text}\"  - add to wish-tiers.json or run /update-wish-tiers");
+                        }
+                    }
+                }
+            }
+            catch { /* MirageWishesPanel access can throw if UI state is transitioning */ }
+        }
+
         // Update minimap state
         var ingameUi = GameController.IngameState.IngameUi;
         var smallMiniMap = ingameUi.Map.SmallMiniMap;
@@ -375,33 +441,15 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
         // Guard: skip during spawn immunity
         if (player.GetComponent<Buffs>()?.HasBuff("grace_period") == true) return;
 
-        // Detect wish panel visibility before UI guards (wish overlay draws ON the popup)
+        // Wish panel detection now happens in Tick() via MirageWishesPanel
         var ingameUi = GameController.Game.IngameState.IngameUi;
-        _wishPanelVisible = false;
-        _cachedWishElements?.Clear();
-        if (Settings.WishAlert.ShowWishTierOverlay)
-        {
-            try
-            {
-                var popUp = GameController.IngameState.IngameUi.PopUpWindow;
-                if (popUp?.IsVisible == true)
-                {
-                    _cachedWishElements ??= new List<Element>();
-                    popUp.GetAllElementsRecursive(
-                        e => e.Text != null && e.Text.StartsWith("Wish for", StringComparison.Ordinal),
-                        _cachedWishElements);
-                    _wishPanelVisible = _cachedWishElements.Count > 0;
-                }
-            }
-            catch { /* PopUpWindow access can throw if UI state is transitioning */ }
-        }
 
         // Guard: skip world overlays when fullscreen/large UI panels are open
         // (but still allow wish tier overlay since it draws on the UI itself)
         if (ingameUi.FullscreenPanels.Any(x => x.IsVisible) ||
             ingameUi.LargePanels.Any(x => x.IsVisible))
         {
-            if (_wishPanelVisible && _knowledgeBase?.Wishes != null && Settings.WishAlert.ShowWishTierOverlay)
+            if (_wishPanelVisible && Settings.WishAlert.ShowWishTierOverlay)
                 DrawWishTierOverlay();
             return;
         }
@@ -651,7 +699,7 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
         } // end if (!_wishPanelVisible)
 
         // Wish tier overlay on the wish selection panel
-        if (_wishPanelVisible && _knowledgeBase?.Wishes != null && Settings.WishAlert.ShowWishTierOverlay)
+        if (_wishPanelVisible && Settings.WishAlert.ShowWishTierOverlay)
         {
             DrawWishTierOverlay();
         }
@@ -670,19 +718,37 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
     {
         if (_cachedWishElements == null || _cachedWishElements.Count == 0) return;
 
+        var flagHighlight = Settings.WishAlert.HighlightFlaggedWishes.Value;
+        var flagColor = Settings.WishAlert.FlaggedWishColor.Value;
+
         foreach (var elem in _cachedWishElements)
         {
             var wishName = elem.Text;
-            _knowledgeBase.Wishes.TryGetValue(wishName, out var wishData);
+            WishTierEntry wishData = null;
+            _wishTiers?.Tiers?.TryGetValue(wishName, out wishData);
 
             var rect = elem.GetClientRectCache;
             if (rect.Width <= 0 || rect.Height <= 0) continue;
 
             var tierText = wishData?.Tier ?? "?";
             var tierColor = TierColors.GetValueOrDefault(tierText, new Color(128, 128, 128));
+            var isFlagged = flagHighlight && wishName != null && _flaggedWishes.Contains(wishName);
+
+            // Flagged wish: pulsing glow border around the entire card
+            if (isFlagged)
+            {
+                var pulse = (float)(0.5 + 0.5 * Math.Sin(Environment.TickCount64 / 300.0));
+                var glowAlpha = (byte)(100 + (int)(100 * pulse));
+                var glowColor = new Color(flagColor.R, flagColor.G, flagColor.B, glowAlpha);
+                var cardMin = new Vector2(rect.X - 3, rect.Y - 3);
+                var cardMax = new Vector2(rect.X + rect.Width + 3, rect.Y + rect.Height + 3);
+                Graphics.DrawFrame(cardMin, cardMax, glowColor, 3);
+                Graphics.DrawBox(cardMin, cardMax, new Color(flagColor.R, flagColor.G, flagColor.B, (byte)(30 + (int)(20 * pulse))));
+            }
 
             // Large tier badge, right-aligned inside the wish name bar
-            using (Graphics.SetTextScale(1.8f))
+            var scale = isFlagged ? 2.2f : 1.8f;
+            using (Graphics.SetTextScale(scale))
             {
                 var textSize = Graphics.MeasureText(tierText);
                 var padding = new Vector2(10, 6);
@@ -693,12 +759,25 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
                 var pillMin = badgeCenter - textSize / 2 - padding;
                 var pillMax = badgeCenter + textSize / 2 + padding;
 
-                // Dark background + tier-colored frame
-                Graphics.DrawBox(pillMin, pillMax, new Color(10, 10, 15, 220));
-                Graphics.DrawFrame(pillMin, pillMax, tierColor, 2);
+                var bgColor = isFlagged ? new Color(flagColor.R / 4, flagColor.G / 4, flagColor.B / 4, 240) : new Color(10, 10, 15, 220);
+                var frameColor = isFlagged ? flagColor : tierColor;
+                Graphics.DrawBox(pillMin, pillMax, bgColor);
+                Graphics.DrawFrame(pillMin, pillMax, frameColor, isFlagged ? 3 : 2);
 
-                // Tier letter
-                Graphics.DrawText(tierText, badgeCenter, tierColor, FontAlign.Center);
+                Graphics.DrawText(tierText, badgeCenter, isFlagged ? flagColor : tierColor, FontAlign.Center);
+            }
+
+            // Flagged wish: "PICK" label above the badge
+            if (isFlagged)
+            {
+                using (Graphics.SetTextScale(1.4f))
+                {
+                    var pickSize = Graphics.MeasureText("PICK");
+                    var pickPos = new Vector2(
+                        rect.X + rect.Width - pickSize.X / 2 - 18,
+                        rect.Y + 4);
+                    Graphics.DrawTextWithBackground("PICK", pickPos, flagColor, FontAlign.Center, new Color(10, 10, 15, 200));
+                }
             }
         }
 
@@ -717,7 +796,8 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
                     continue;
 
                 var wishName = elem.Text;
-                _knowledgeBase.Wishes.TryGetValue(wishName, out var wishData);
+                WishTierEntry wishData = null;
+                _wishTiers?.Tiers?.TryGetValue(wishName, out wishData);
 
                 var tierText = wishData?.Tier ?? "?";
                 var tierColor4 = TierColors.TryGetValue(tierText, out var tc)
@@ -734,9 +814,8 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
 
                 if (wishData != null)
                 {
-                    ImGui.TextColored(new Vector4(0.88f, 0.88f, 0.88f, 1f), wishData.Effect);
-                    if (!string.IsNullOrEmpty(wishData.Category))
-                        ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.55f, 1f), $"Category: {wishData.Category}");
+                    if (!string.IsNullOrEmpty(wishData.Effect))
+                        ImGui.TextColored(new Vector4(0.88f, 0.88f, 0.88f, 1f), wishData.Effect);
                     if (!string.IsNullOrEmpty(wishData.Notes))
                     {
                         ImGui.Spacing();
@@ -745,7 +824,7 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
                 }
                 else
                 {
-                    ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f), "Unknown wish - not in knowledge base");
+                    ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f), "Unknown wish  - run /update-wish-tiers");
                 }
 
                 ImGui.EndTooltip();
@@ -754,6 +833,19 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
                 break; // one tooltip at a time
             }
         }
+    }
+
+    private static Element FindWishNameElement(Element element)
+    {
+        if (element == null) return null;
+        if (element.Text?.StartsWith("Wish for", StringComparison.Ordinal) == true)
+            return element;
+        foreach (var child in element.Children)
+        {
+            var result = FindWishNameElement(child);
+            if (result != null) return result;
+        }
+        return null;
     }
 
     private void RequestPathForAnchor(MirageChainAnchorData anchor)
@@ -962,7 +1054,7 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
 
         Graphics.DrawConvexPolyFilled(new[] { tip, baseLeft, baseRight }, arrowColor);
 
-        // Draw distance text near arrow (use cached position — works even when out of range)
+        // Draw distance text near arrow (use cached position  - works even when out of range)
         var dist = Vector2.Distance(playerGridPos, target.LastKnownGridPos);
         Graphics.DrawText($"{(int)dist}", arrowCenter + direction * (arrowSize + 10), arrowColor, FontAlign.Center);
     }
@@ -1014,7 +1106,7 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
             _radarLookForRoute != null,
             _isMirageZone,
             _varashta,
-            _knowledgeBase
-        ), RefreshKnowledgeBase);
+            _wishTiers
+        ), RefreshWishTiers, IsWishFlagged, ToggleWishFlag);
     }
 }

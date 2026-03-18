@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mirage Wish Tier List</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --bg-card: #131320;
+    --bg-card-hover: #1a1a2e;
+    --gold: #D4A017;
+    --gold-dim: #8a6a10;
+    --gold-glow: rgba(212, 160, 23, 0.4);
+    --text: #e8e0d0;
+    --text-dim: #8a8272;
+    --text-dimmer: #5a5448;
+    --border: #2a2a3a;
+    --tier-s: #22c55e;
+    --tier-a: #3b82f6;
+    --tier-b: #a78bfa;
+    --tier-c: #f59e0b;
+    --tier-d: #6b7280;
+  }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  /* Subtle desert texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 0%, rgba(212, 160, 23, 0.06) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 100%, rgba(212, 160, 23, 0.04) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h1 {
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 0.02em;
+    text-shadow: 0 0 30px rgba(212, 160, 23, 0.3);
+    margin-bottom: 0.4rem;
+  }
+
+  .subtitle {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* Controls bar */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 2rem;
+  }
+
+  .search-wrap {
+    position: relative;
+    flex: 1 1 320px;
+    max-width: 480px;
+  }
+
+  .search-wrap svg {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    color: var(--text-dim);
+  }
+
+  #search {
+    width: 100%;
+    padding: 0.65rem 1rem 0.65rem 2.6rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  #search:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(212, 160, 23, 0.15);
+  }
+
+  #search::placeholder { color: var(--text-dimmer); }
+
+  .tier-filters {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .tier-btn {
+    padding: 0.45rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-card);
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.04em;
+  }
+
+  .tier-btn:hover { border-color: var(--gold-dim); color: var(--text); }
+
+  .tier-btn.active {
+    background: var(--gold);
+    color: var(--bg);
+    border-color: var(--gold);
+  }
+
+  .tier-btn.active:hover { background: #e0ad1f; }
+
+  .flagged-toggle {
+    padding: 0.45rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-card);
+    color: var(--gold-dim);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .flagged-toggle:hover { border-color: var(--gold-dim); color: var(--gold); }
+  .flagged-toggle.active {
+    background: rgba(212, 160, 23, 0.15);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  /* Tier sections */
+  .tier-section {
+    margin-bottom: 2rem;
+    transition: opacity 0.3s;
+  }
+
+  .tier-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tier-header-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .tier-header-label {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .tier-header-count {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-left: auto;
+    font-weight: 400;
+  }
+
+  /* Card grid */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s, opacity 0.3s;
+    position: relative;
+    cursor: default;
+  }
+
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+    background: var(--bg-card-hover);
+  }
+
+  .card.flagged {
+    border-color: var(--gold);
+    box-shadow: 0 0 12px var(--gold-glow), 0 0 30px rgba(212, 160, 23, 0.1);
+  }
+
+  .card.hidden {
+    display: none;
+  }
+
+  .card-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .tier-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    font-weight: 800;
+    font-size: 0.8rem;
+    color: #fff;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .tier-S { background: var(--tier-s); }
+  .tier-A { background: var(--tier-a); }
+  .tier-B { background: var(--tier-b); }
+  .tier-C { background: var(--tier-c); }
+  .tier-D { background: var(--tier-d); }
+
+  .card-name {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text);
+    flex: 1;
+    line-height: 1.4;
+  }
+
+  .star-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: var(--text-dimmer);
+    padding: 0;
+    line-height: 1;
+    transition: color 0.2s, transform 0.15s;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .star-btn:hover { color: var(--gold); transform: scale(1.2); }
+  .star-btn.active { color: var(--gold); }
+
+  .card-effect {
+    font-size: 0.88rem;
+    color: var(--text);
+    opacity: 0.85;
+    margin-bottom: 0.4rem;
+    line-height: 1.45;
+  }
+
+  .card-notes {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    font-style: italic;
+    margin-bottom: 0.3rem;
+  }
+
+  .card-id {
+    font-size: 0.68rem;
+    color: var(--text-dimmer);
+    font-family: 'Consolas', 'Monaco', monospace;
+  }
+
+  /* Empty state */
+  .empty-msg {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    display: none;
+  }
+
+  .empty-msg.visible { display: block; }
+
+  /* Stats bar */
+  .stats-bar {
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--text-dimmer);
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    .container { padding: 1rem; }
+    h1 { font-size: 1.6rem; }
+    .card-grid { grid-template-columns: 1fr; }
+    .controls { flex-direction: column; }
+    .search-wrap { max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Mirage Wish Tier List</h1>
+    <p class="subtitle">Data source: PoEDB | v5.0 | 62 wishes</p>
+  </header>
+
+  <div class="controls">
+    <div class="search-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/>
+      </svg>
+      <input type="text" id="search" placeholder="Search wishes by name, effect, or notes..." autocomplete="off">
+    </div>
+    <div class="tier-filters">
+      <button class="tier-btn active" data-tier="All">All</button>
+      <button class="tier-btn" data-tier="S">S</button>
+      <button class="tier-btn" data-tier="A">A</button>
+      <button class="tier-btn" data-tier="B">B</button>
+      <button class="tier-btn" data-tier="C">C</button>
+      <button class="tier-btn" data-tier="D">D</button>
+    </div>
+    <button class="flagged-toggle" id="flaggedToggle" title="Show only flagged wishes">&#9733; Flagged</button>
+  </div>
+
+  <div id="content"></div>
+  <div class="empty-msg" id="emptyMsg">No wishes match your current filters.</div>
+  <div class="stats-bar" id="statsBar"></div>
+</div>
+
+<script>
+const WISHES = [
+  {"name":"Wish for Wealth","tier":"S","effect":"100% more Currency found in the Mirage Area.","internalId":"MapModWishMoreCurrency","notes":"Multiplicative with juiced maps. Always take."},
+  {"name":"Wish for Foreknowledge","tier":"S","effect":"100% more Divination Cards found in the Mirage Area.","internalId":"MapModWishMoreDivCards","notes":"Top pick for div card farming strategies."},
+  {"name":"Wish for Horizons","tier":"S","effect":"100% more Maps found in the Mirage Area.","internalId":"MapModWishMoreMapDrops","notes":"Sustain + profit. Great for atlas completion."},
+  {"name":"Wish for Rust","tier":"S","effect":"Breaking the Astral Chain in the Mirage Area will spawn Ridan, of the Afarud.","internalId":"MapModWishFaridunMiniboss","notes":"Drops The Black Barya. Boss-killer builds only."},
+  {"name":"Wish for Betrayal","tier":"S","effect":"Some packs in the Mirage Area will be replaced with Syndicate members.","internalId":"MapModWishGeneric","notes":"High scarab yield. Needs Syndicate board setup."},
+  {"name":"Wish for Scarabs","tier":"S","effect":"80% more Scarabs found in the Mirage Area.","internalId":"MapModWishMoreScarabs","notes":"Scales with scarab-focused atlas."},
+  {"name":"Wish for Treasures","tier":"A","effect":"80% increased Rarity of items found in the Mirage Area.","internalId":"MapModWishMoreRarity","notes":"Good for unique farming."},
+  {"name":"Wish for Hordes","tier":"A","effect":"20% increased Pack Size in the Mirage Area.","internalId":"MapModWishGeneric","notes":"More monsters = more drops. Solid generic pick."},
+  {"name":"Wish for Terror","tier":"A","effect":"Breaking the Astral Chain in the Mirage Area will spawn a Pinnacle Atlas Boss from the Feared.","internalId":"MapModBossAddition","notes":"High risk/reward. Needs strong boss-killer build."},
+  {"name":"Wish for Titans","tier":"A","effect":"Mirage Area will contain 3 additional packs of Atlas Bosses.","internalId":"MapModWishStandaloneBosses","notes":"Atlas boss uniques. Good with Destructive Play."},
+  {"name":"Wish for Risk","tier":"A","effect":"Mirage Area will contain 12 additional packs of difficult and rewarding monsters.","internalId":"MapModWishAtlasPacks","notes":"Extra density with better loot."},
+  {"name":"Wish for Meddling","tier":"A","effect":"Mirage Area will contain 12 additional packs of Astral monsters.","internalId":"MapModWishZarokhPacks","notes":"Pure density, less reward per pack."},
+  {"name":"Wish for Troves","tier":"A","effect":"An additional Unique Strongbox will appear in the Mirage Area.","internalId":"MapModWishUniqueStrongbox","notes":"Decent unique source."},
+  {"name":"Wish for Reflection","tier":"A","effect":"A Reflecting Mist will appear on breaking the Astral Chain in the Mirage Area.","internalId":"MapModWishReflectingMist","notes":"Mirror-tier crafting potential."},
+  {"name":"Wish for Knowledge","tier":"A","effect":"Players in Mirage Area gain 50% increased Experience.","internalId":"MapModWishExperienceGain","notes":"Leveling only. Worthless at cap."},
+  {"name":"Wish for Prosperity","tier":"A","effect":"Mirage Area will contain an additional fountain of wealth.","internalId":"MapModWishGoldFountain","notes":"Bonus currency fountains. Solid value."},
+  {"name":"Wish for Glyphs","tier":"A","effect":"Portal Scrolls and Wisdom Scrolls found in Mirage Area will instead drop as other Currencies.","internalId":"MapModWishScrollConversion","notes":"Currency upgrade. Good in scroll-heavy maps."},
+  {"name":"Wish for Augury","tier":"A","effect":"Breaking the Astral Chain in the Mirage Area will reward a cache of Stacked Decks.","internalId":"MapModWishGeneric","notes":"Stacked Decks. Good gambling value."},
+  {"name":"Wish for Skittering","tier":"A","effect":"Breaking the Astral Chain in the Mirage Area will reward a cache of Scarabs.","internalId":"MapModWishGeneric","notes":"Free scarabs. Always useful."},
+  {"name":"Wish for Strange Horizons","tier":"A","effect":"Breaking the Astral Chain in the Mirage Area will reward a Unique Map.","internalId":"MapModWishGeneric","notes":"Unique Map drop. Can be very valuable."},
+  {"name":"Wish for Souls","tier":"B","effect":"Players in Mirage Area have Soul Eater.","internalId":"MapModWishPlayersSoulEater","notes":"Fun combat buff but no loot value."},
+  {"name":"Wish for Momentum","tier":"B","effect":"Players in Mirage Area have Onslaught and Adrenaline.","internalId":"MapModWishPlayersAdrenalineOnslaught","notes":"Speed buff. Minor value."},
+  {"name":"Wish for Power","tier":"B","effect":"Enemies slain by Players in Mirage Area explode on death.","internalId":"MapModWishPlayersExplodeOnKill","notes":"Clear speed, no loot."},
+  {"name":"Wish for Gold","tier":"B","effect":"Players in Mirage Area find 80% more Gold from slain Enemies.","internalId":"MapModWishGoldFind","notes":"Gold value depends on vendor economy."},
+  {"name":"Wish for Foes","tier":"B","effect":"Rare Monsters in the Mirage Area will have two additional modifiers.","internalId":"MapModWishNemeses","notes":"More archnem loot. Build-dependent."},
+  {"name":"Wish for Fortune","tier":"B","effect":"Breaking the Astral Chain in the Mirage Area will reward a cache of Currency.","internalId":"MapModWishGeneric","notes":"Fixed reward, doesn't scale."},
+  {"name":"Wish for Uncertainty","tier":"B","effect":"Mirage Area will be affected by 10 random Scarab modifiers.","internalId":"MapModWishRandomScarabModifiers","notes":"Random. Can be great or terrible."},
+  {"name":"Wish for Providence","tier":"B","effect":"The Nameless Seer will appear on breaking the Astral Chain in the Mirage Area.","internalId":"MapModWishNamelessSeer","notes":"Prophecy-like encounter."},
+  {"name":"Wish for Wisps","tier":"B","effect":"Enemies in Mirage Area have a chance to be empowered by Wildwood Wisps.","internalId":"MapModWishGeneric","notes":"Extra juice if build handles it."},
+  {"name":"Wish for Godhood","tier":"B","effect":"Players in Mirage Area have Echoing Shrine and Divine Shrine.","internalId":"MapModWishPlayersCannotDie","notes":"Powerful shrine effects. Good defensive option."},
+  {"name":"Wish for Pursuit","tier":"B","effect":"Enemies in the Mirage Area have a 4% chance to release a Golden Volatile on death.","internalId":"MapModWishGoldenVolatiles","notes":"Gambling. Low expected value."},
+  {"name":"Wish for Jewels","tier":"B","effect":"An additional Jewel Cache will appear in the Mirage Area.","internalId":"MapModWishDjinnsChestSilver","notes":"Jewel drops. Moderate value."},
+  {"name":"Wish for Hindrance","tier":"B","effect":"Enemies in the Mirage Area will be Chilled and Hindered.","internalId":"MapModWishMonstersChilledHindered","notes":"Defensive. Slows enemies for safer clearing."},
+  {"name":"Wish for Oases","tier":"B","effect":"Mirage Area has patches of Oasis Ground.","internalId":"MapModWishOasisGround","notes":"Ground effects. Minor zone modifier."},
+  {"name":"Wish for Glittering","tier":"B","effect":"Skill and Support Gems found in Mirage Area will have a random amount of Quality.","internalId":"MapModWishGeneric","notes":"Quality gems. Can hit valuable quality."},
+  {"name":"Wish for Avarice","tier":"B","effect":"Some packs in the Mirage Area will be replaced with Monsters that convert dropped Equipment to Gold.","internalId":"MapModWishGeneric","notes":"More gold, fewer item drops."},
+  {"name":"Wish for Elements","tier":"B","effect":"Players in Mirage Area have the Blessing of the Storm.","internalId":"MapModWishGeneric","notes":"Elemental buff. Moderate combat value."},
+  {"name":"Wish for Distant Horizons","tier":"B","effect":"Breaking the Astral Chain in the Mirage Area will reward a cache of Maps.","internalId":"MapModWishGeneric","notes":"Maps cache. Decent for sustain."},
+  {"name":"Wish for Eminence","tier":"B","effect":"Breaking the Astral Chain in the Mirage Area will reward an additional Unique Jewel.","internalId":"MapModBossUniqueJewel","notes":"Unique jewel. Can be valuable."},
+  {"name":"Wish for Ancient Protection","tier":"B","effect":"Breaking the Astral Chain in the Mirage Area will reward a Unique Armour.","internalId":"MapModWishGeneric","notes":"Unique armour drop. Variable value."},
+  {"name":"Wish for Ancient Armaments","tier":"B","effect":"Breaking the Astral Chain in the Mirage Area will reward a Unique Weapon.","internalId":"MapModWishGeneric","notes":"Unique weapon drop. Variable value."},
+  {"name":"Wish for Ancient Curios","tier":"B","effect":"Breaking the Astral Chain in the Mirage Area will reward a Unique Jewellery item.","internalId":"MapModWishGeneric","notes":"Unique jewellery drop. Can hit big."},
+  {"name":"Wish for Trinkets","tier":"B","effect":"Jewellery found in Mirage Area will instead drop as Jewels.","internalId":"MapModWishJewelleryConversion","notes":"Jewellery-to-Jewel conversion. Useful for jewel farming."},
+  {"name":"Wish for Flame","tier":"B","effect":"Breaking the Astral Chain in the Mirage Area will reward a Coin of Power.","internalId":"MapModWishGeneric","notes":"Coin for imbuing level 20 gems. Valuable if needed."},
+  {"name":"Wish for Tides","tier":"B","effect":"Breaking the Astral Chain in the Mirage Area will reward a Coin of Knowledge.","internalId":"MapModWishGeneric","notes":"Coin for imbuing level 20 gems. Valuable if needed."},
+  {"name":"Wish for Sands","tier":"B","effect":"Breaking the Astral Chain in the Mirage Area will reward a Coin of Skill.","internalId":"MapModWishGeneric","notes":"Coin for imbuing level 20 gems. Valuable if needed."},
+  {"name":"Wish for Rebirth","tier":"C","effect":"Monsters in the Mirage Area will have a chance to revive when slain.","internalId":"MapModWishRevivingMonsters","notes":"Double kill credit. Minor loot boost."},
+  {"name":"Wish for Binding","tier":"C","effect":"Breaking the Astral Chain in the Mirage Area will reward Orbs of Binding.","internalId":"MapModWishGeneric","notes":"Low-value currency. Take if nothing else."},
+  {"name":"Wish for Regency","tier":"C","effect":"Breaking the Astral Chain in the Mirage Area will reward Regal Orbs.","internalId":"MapModWishGeneric","notes":"Regals. Modest value."},
+  {"name":"Wish for Connections","tier":"C","effect":"Breaking the Astral Chain in the Mirage Area will reward Fusing or Jewellers Orbs.","internalId":"MapModWishGeneric","notes":"Linking currency. Steady but low."},
+  {"name":"Wish for Mosaics","tier":"C","effect":"Breaking the Astral Chain in the Mirage Area will reward Chromatic Orbs.","internalId":"MapModWishGeneric","notes":"Chromatics. Minimal value."},
+  {"name":"Wish for Craftsmanship","tier":"C","effect":"Breaking the Astral Chain in the Mirage Area will reward a Five-Linked Body Armour.","internalId":"MapModWishGeneric","notes":"Pre-linked base. Niche crafting use."},
+  {"name":"Wish for Swiftness","tier":"C","effect":"Breaking the Astral Chain in the Mirage Area will reward Rare Boots.","internalId":"MapModWishGeneric","notes":"Random rare boots. Usually vendor."},
+  {"name":"Wish for Helms","tier":"C","effect":"Breaking the Astral Chain in the Mirage Area will reward Rare Helmets.","internalId":"MapModWishGeneric","notes":"Random rare helmet. Usually vendor."},
+  {"name":"Wish for Mitts","tier":"C","effect":"Breaking the Astral Chain in the Mirage Area will reward Rare Gloves.","internalId":"MapModWishGeneric","notes":"Random rare gloves. Usually vendor."},
+  {"name":"Wish for Protection","tier":"C","effect":"Breaking the Astral Chain in the Mirage Area will reward Rare Body Armours.","internalId":"MapModWishGeneric","notes":"Random rare body armour. Usually vendor."},
+  {"name":"Wish for Blades","tier":"C","effect":"Breaking the Astral Chain in the Mirage Area will reward Rare Melee Weapons.","internalId":"MapModWishGeneric","notes":"Random rare weapon. Usually vendor."},
+  {"name":"Wish for Missiles","tier":"C","effect":"Breaking the Astral Chain in the Mirage Area will reward Rare Ranged Weapons.","internalId":"MapModWishGeneric","notes":"Random rare ranged. Usually vendor."},
+  {"name":"Wish for Bastions","tier":"C","effect":"Breaking the Astral Chain in the Mirage Area will reward Rare Shields.","internalId":"MapModWishGeneric","notes":"Random rare shields. Usually vendor."},
+  {"name":"Wish for Phantoms","tier":"D","effect":"Some packs in the Mirage Area will be replaced with Monsters that cannot drop Equipment.","internalId":"MapModWishGeneric","notes":"Actively harmful. Never take."},
+  {"name":"Wish for Croaks","tier":"D","effect":"Mirage Area contains additional frogs.","internalId":"MapModWishFrogPacks","notes":"Joke wish. No value."},
+  {"name":"Wish for Fishes","tier":"D","effect":"Claim a Fishing Rod.","internalId":"MapModWishFish","notes":"Meme. No value."}
+];
+
+const TIER_ORDER = ['S', 'A', 'B', 'C', 'D'];
+const TIER_LABELS = { S: 'S-Tier', A: 'A-Tier', B: 'B-Tier', C: 'C-Tier', D: 'D-Tier' };
+const TIER_COLORS = { S: '#22c55e', A: '#3b82f6', B: '#a78bfa', C: '#f59e0b', D: '#6b7280' };
+
+// LocalStorage flagging
+const LS_KEY = 'mirage-wish-flags';
+function loadFlags() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch { return {}; }
+}
+function saveFlags(f) { localStorage.setItem(LS_KEY, JSON.stringify(f)); }
+let flags = loadFlags();
+
+// State
+let activeTier = 'All';
+let showFlaggedOnly = false;
+let searchQuery = '';
+
+function render() {
+  const content = document.getElementById('content');
+  let html = '';
+
+  for (const tier of TIER_ORDER) {
+    const wishes = WISHES.filter(w => w.tier === tier);
+    const visibleWishes = wishes.filter(w => isVisible(w));
+
+    const sectionHidden = visibleWishes.length === 0 ? ' style="display:none"' : '';
+
+    html += `<div class="tier-section" data-tier="${tier}"${sectionHidden}>`;
+    html += `<div class="tier-header">`;
+    html += `<span class="tier-header-badge tier-${tier}" style="background:${TIER_COLORS[tier]}">${tier}</span>`;
+    html += `<span class="tier-header-label">${TIER_LABELS[tier]}</span>`;
+    html += `<span class="tier-header-count" data-tier-count="${tier}">${visibleWishes.length} of ${wishes.length}</span>`;
+    html += `</div>`;
+    html += `<div class="card-grid">`;
+
+    for (const w of wishes) {
+      const vis = isVisible(w);
+      const flagged = flags[w.name] ? true : false;
+      const cls = ['card'];
+      if (!vis) cls.push('hidden');
+      if (flagged) cls.push('flagged');
+
+      html += `<div class="${cls.join(' ')}" data-name="${esc(w.name)}">`;
+      html += `<div class="card-top">`;
+      html += `<span class="tier-badge tier-${w.tier}">${w.tier}</span>`;
+      html += `<span class="card-name">${esc(w.name)}</span>`;
+      html += `<button class="star-btn${flagged ? ' active' : ''}" data-flag="${esc(w.name)}" title="Flag this wish">&#9733;</button>`;
+      html += `</div>`;
+      html += `<div class="card-effect">${esc(w.effect)}</div>`;
+      html += `<div class="card-notes">${esc(w.notes)}</div>`;
+      html += `<div class="card-id">${esc(w.internalId)}</div>`;
+      html += `</div>`;
+    }
+
+    html += `</div></div>`;
+  }
+
+  content.innerHTML = html;
+
+  // Check total visible
+  const totalVisible = WISHES.filter(w => isVisible(w)).length;
+  document.getElementById('emptyMsg').classList.toggle('visible', totalVisible === 0);
+  document.getElementById('statsBar').textContent = `Showing ${totalVisible} of ${WISHES.length} wishes`;
+
+  // Attach star click handlers
+  content.querySelectorAll('.star-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const name = btn.getAttribute('data-flag');
+      if (flags[name]) { delete flags[name]; } else { flags[name] = true; }
+      saveFlags(flags);
+      applyFilters();
+    });
+  });
+}
+
+function isVisible(w) {
+  // Tier filter
+  if (activeTier !== 'All' && w.tier !== activeTier) return false;
+  // Flagged filter
+  if (showFlaggedOnly && !flags[w.name]) return false;
+  // Search filter
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    const haystack = (w.name + ' ' + w.effect + ' ' + w.notes + ' ' + w.internalId).toLowerCase();
+    if (!haystack.includes(q)) return false;
+  }
+  return true;
+}
+
+function applyFilters() {
+  // Instead of full re-render, toggle visibility on existing cards
+  const cards = document.querySelectorAll('.card');
+  const counts = { S: 0, A: 0, B: 0, C: 0, D: 0 };
+  const totals = { S: 0, A: 0, B: 0, C: 0, D: 0 };
+  let totalVisible = 0;
+
+  WISHES.forEach((w, i) => {
+    totals[w.tier]++;
+  });
+
+  cards.forEach(card => {
+    const name = card.getAttribute('data-name');
+    const w = WISHES.find(x => x.name === name);
+    if (!w) return;
+    const vis = isVisible(w);
+    card.classList.toggle('hidden', !vis);
+    card.classList.toggle('flagged', !!flags[w.name]);
+    const starBtn = card.querySelector('.star-btn');
+    if (starBtn) starBtn.classList.toggle('active', !!flags[w.name]);
+    if (vis) { counts[w.tier]++; totalVisible++; }
+  });
+
+  // Update section visibility and counts
+  document.querySelectorAll('.tier-section').forEach(section => {
+    const tier = section.getAttribute('data-tier');
+    const visible = counts[tier] > 0;
+    section.style.display = visible ? '' : 'none';
+    const countEl = section.querySelector('[data-tier-count]');
+    if (countEl) countEl.textContent = `${counts[tier]} of ${totals[tier]}`;
+  });
+
+  document.getElementById('emptyMsg').classList.toggle('visible', totalVisible === 0);
+  document.getElementById('statsBar').textContent = `Showing ${totalVisible} of ${WISHES.length} wishes`;
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// Init
+render();
+
+// Search
+document.getElementById('search').addEventListener('input', (e) => {
+  searchQuery = e.target.value.trim();
+  applyFilters();
+});
+
+// Tier buttons
+document.querySelectorAll('.tier-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tier-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeTier = btn.getAttribute('data-tier');
+    applyFilters();
+  });
+});
+
+// Flagged toggle
+document.getElementById('flaggedToggle').addEventListener('click', () => {
+  showFlaggedOnly = !showFlaggedOnly;
+  document.getElementById('flaggedToggle').classList.toggle('active', showFlaggedOnly);
+  applyFilters();
+});
+</script>
+
+</body>
+</html>

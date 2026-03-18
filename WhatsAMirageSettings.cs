@@ -109,4 +109,6 @@ public class WishAlertSettings
     public ColorNode AlertColor { get; set; } = new Color(255, 215, 0, 255);
     public ToggleNode ShowWishTierOverlay { get; set; } = new(true);
     public ToggleNode ShowWishTooltip { get; set; } = new(true);
+    public ToggleNode HighlightFlaggedWishes { get; set; } = new(true);
+    public ColorNode FlaggedWishColor { get; set; } = new Color(255, 215, 0, 255);
 }

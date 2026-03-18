@@ -136,20 +136,19 @@ public class FaridunInitiatorData
     }
 }
 
-// Knowledge base DTOs
-public class MirageKnowledgeBase
+// Wish tier DTOs (loaded from wish-tiers.json, updated via /update-wish-tiers)
+public class WishTierFile
 {
     [JsonProperty("version")] public string Version { get; set; }
     [JsonProperty("lastUpdated")] public string LastUpdated { get; set; }
-    [JsonProperty("status")] public string Status { get; set; }
-    [JsonProperty("wishes")] public Dictionary<string, WishData> Wishes { get; set; }
-    [JsonProperty("tierColors")] public Dictionary<string, string> TierColors { get; set; }
+    [JsonProperty("source")] public string Source { get; set; }
+    [JsonProperty("tiers")] public Dictionary<string, WishTierEntry> Tiers { get; set; }
 }
 
-public class WishData
+public class WishTierEntry
 {
     [JsonProperty("tier")] public string Tier { get; set; }
-    [JsonProperty("category")] public string Category { get; set; }
     [JsonProperty("effect")] public string Effect { get; set; }
+    [JsonProperty("internalId")] public string InternalId { get; set; }
     [JsonProperty("notes")] public string Notes { get; set; }
 }
