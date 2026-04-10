@@ -63,6 +63,7 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
 
     public override bool Initialise()
     {
+        Name = "Whats A Mirage";
         LoadWishTiers();
         _flaggedWishesPath = Path.Combine(ConfigDirectory, "flagged-wishes.json");
         LoadFlaggedWishes();
