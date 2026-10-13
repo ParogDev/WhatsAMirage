@@ -23,8 +23,8 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
 {
     public override void OnClose()
     {
-        HudLog.Flush();
-        base.OnClose();
+        try { HudLog.Flush(); }
+        finally { base.OnClose(); }
     }
 
     private readonly Dictionary<uint, MirageSpawnerData> _spawners = new();
