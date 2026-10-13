@@ -21,6 +21,12 @@ namespace WhatsAMirage;
 
 public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
 {
+    public override void OnClose()
+    {
+        try { HudLog.Flush(); }
+        finally { base.OnClose(); }
+    }
+
     private readonly Dictionary<uint, MirageSpawnerData> _spawners = new();
     private readonly Dictionary<uint, MirageChestData> _chests = new();
     private readonly Dictionary<uint, MirageMonsterData> _monsters = new();
@@ -83,7 +89,7 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
     private void SaveFlaggedWishes()
     {
         try { File.WriteAllText(_flaggedWishesPath, JsonConvert.SerializeObject(_flaggedWishes.OrderBy(x => x).ToList(), Formatting.Indented)); }
-        catch (Exception ex) { LogError($"Failed to save flagged wishes: {ex.Message}"); }
+        catch (Exception ex) { HudLog.Fault($"Failed to save flagged wishes: {ex.GetType().Name}: {ex.Message}", "save-flagged"); }
     }
 
     public bool IsWishFlagged(string wishName) => _flaggedWishes.Contains(wishName);
@@ -119,16 +125,16 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
                 if (File.Exists(full))
                 {
                     _wishTiers = JsonConvert.DeserializeObject<WishTierFile>(File.ReadAllText(full));
-                    LogMsg($"Loaded wish tiers v{_wishTiers?.Version} ({_wishTiers?.Tiers?.Count ?? 0} wishes) from {full}");
+                    HudLog.Quiet($"Loaded wish tiers v{_wishTiers?.Version} ({_wishTiers?.Tiers?.Count ?? 0} wishes) from {full}");
                     return;
                 }
             }
 
-            LogError("wish-tiers.json not found in any expected location");
+            HudLog.Fault($"wish-tiers.json not found; looked in: {string.Join(", ", candidates.Select(Path.GetFullPath))}", "tiers-missing");
         }
         catch (Exception ex)
         {
-            LogError($"Failed to load wish tiers: {ex.Message}");
+            HudLog.Fault($"Failed to load wish tiers: {ex.GetType().Name}: {ex.Message}", "load-tiers");
         }
     }
 
@@ -399,7 +405,7 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
                         foreach (var (_, name) in _cachedWishElements)
                         {
                             if (name.Text != null && !_wishTiers.Tiers.ContainsKey(name.Text) && _loggedUnknownWishes.Add(name.Text))
-                                LogMsg($"Unknown wish discovered: \"{name.Text}\"  - add to wish-tiers.json or run /update-wish-tiers");
+                                HudLog.Quiet($"Unknown wish discovered: \"{name.Text}\"  - add to wish-tiers.json or run /update-wish-tiers");
                         }
                     }
                 }
