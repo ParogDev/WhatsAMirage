@@ -237,23 +237,22 @@ public sealed class MirageSettingsUi
         var dl = ImGui.GetWindowDrawList();
         foreach (var tier in TierOrder)
         {
+            // flagged first, then the rest, each in file order (two passes: stable, so flagging never reshuffles a tier)
             _wishRows.Clear();
-            foreach (var kv in kb.Tiers)
-            {
-                if (kv.Value?.Tier != tier) continue;
-                if (search.Length > 0
-                    && !kv.Key.Contains(search, StringComparison.OrdinalIgnoreCase)
-                    && !(kv.Value.Effect?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
-                    && !(kv.Value.Notes?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false))
-                    continue;
-                _wishRows.Add(kv);
-            }
+            for (int pass = 0; pass < 2; pass++)
+                foreach (var kv in kb.Tiers)
+                {
+                    if (TierKey(kv.Value) != tier) continue;
+                    bool flaggedRow = _isWishFlagged?.Invoke(kv.Key) == true;
+                    if (flaggedRow != (pass == 0)) continue;
+                    if (search.Length > 0
+                        && !kv.Key.Contains(search, StringComparison.OrdinalIgnoreCase)
+                        && !(kv.Value?.Effect?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
+                        && !(kv.Value?.Notes?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false))
+                        continue;
+                    _wishRows.Add(kv);
+                }
             if (_wishRows.Count == 0) continue;
-            if (_isWishFlagged != null)
-            {
-                var isFlagged = _isWishFlagged;
-                _wishRows.Sort((a, b) => (isFlagged(a.Key) ? 0 : 1).CompareTo(isFlagged(b.Key) ? 0 : 1));
-            }
 
             var tierCol = TierColor(tier);
             ImGui.Spacing();
@@ -261,7 +260,9 @@ public sealed class MirageSettingsUi
             float rowW = ImGui.GetContentRegionAvail().X;
             dl.AddRectFilled(hMin, hMin + new Vector2(rowW, ImGui.GetTextLineHeight() + 2f), ImGui.GetColorU32(tierCol with { W = 0.08f }));
             ImGui.Indent(6f);
-            SettingsMenu.Text(tierCol, $"Tier {tier}  ({_wishRows.Count})");
+            SettingsMenu.Text(tierCol, tier == "?"
+                ? $"Unrated / unknown tier  ({_wishRows.Count})"
+                : $"Tier {tier}  ({_wishRows.Count})");
             ImGui.Unindent(6f);
 
             foreach (var kv in _wishRows) DrawWishRow(dl, kv.Key, kv.Value, tierCol, rowW);
@@ -279,9 +280,9 @@ public sealed class MirageSettingsUi
             isFlagged ? MirageGold : TextCol with { W = 0.25f }, isFlagged);
         ImGui.Indent(22f);
         SettingsMenu.Text(isFlagged ? MirageGold : TextCol, name);
-        ImGui.PushTextWrapPos(rowMin.X + rowW - ImGui.GetWindowPos().X - 6f);
-        if (!string.IsNullOrEmpty(wish.Effect)) SettingsMenu.Dim(wish.Effect);
-        if (!string.IsNullOrEmpty(wish.Notes)) SettingsMenu.Text(tierCol with { W = 0.7f }, wish.Notes);
+        ImGui.PushTextWrapPos(0f);   // wrap at the content edge (left of the scrollbar)
+        if (!string.IsNullOrEmpty(wish?.Effect)) SettingsMenu.Dim(wish.Effect);
+        if (!string.IsNullOrEmpty(wish?.Notes)) SettingsMenu.Text(tierCol with { W = 0.7f }, wish.Notes);
         ImGui.PopTextWrapPos();
         ImGui.Unindent(22f);
         var after = ImGui.GetCursorScreenPos();
@@ -290,7 +291,8 @@ public sealed class MirageSettingsUi
         // one click target over the whole row, laid over the text just drawn
         ImGui.SetCursorScreenPos(rowMin);
         ImGui.PushID(name);
-        ImGui.InvisibleButton("##wish", new Vector2(rowW, Math.Max(1f, rowMax.Y - rowMin.Y)));
+        // InvisibleButton returns true on release over the row, so a press that turns into a scroll drag flips nothing
+        bool clicked = ImGui.InvisibleButton("##wish", new Vector2(rowW, Math.Max(1f, rowMax.Y - rowMin.Y)));
         ImGui.PopID();
         if (ImGui.IsItemHovered())
         {
@@ -298,7 +300,7 @@ public sealed class MirageSettingsUi
             ImGui.SetMouseCursor(ImGuiMouseCursor.Hand);
             SettingsMenu.Tooltip(isFlagged ? "Click to remove from your watchlist" : "Click to flag: highlighted with PICK in game");
         }
-        if (ImGui.IsItemClicked()) _toggleWishFlag?.Invoke(name);
+        if (clicked) _toggleWishFlag?.Invoke(name);
         if (isFlagged)
         {
             dl.AddRectFilled(rowMin, rowMax, ImGui.GetColorU32(MirageGold with { W = 0.06f }), 3f);
@@ -306,6 +308,13 @@ public sealed class MirageSettingsUi
         }
         ImGui.SetCursorScreenPos(after);
         ImGui.Dummy(new Vector2(1f, 2f));
+    }
+
+    /// <summary>S/A/B/C/D (any case, trimmed); anything else, missing or empty lands in "?" so no wish is dropped.</summary>
+    private static string TierKey(WishTierEntry? e)
+    {
+        var t = e?.Tier?.Trim().ToUpperInvariant();
+        return t is "S" or "A" or "B" or "C" or "D" ? t : "?";
     }
 
     private static Vector4 TierColor(string tier) => tier switch
