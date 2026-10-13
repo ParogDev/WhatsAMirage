@@ -55,7 +55,7 @@ public sealed class MirageSettingsUi
 
     public MirageSettingsUi()
     {
-        _menu = new SettingsMenu { Accent = Accent, RootTabName = "Spawners" }
+        _menu = new SettingsMenu(m => HudLog.Fault(m)) { Accent = Accent, RootTabName = "Spawners" }
             .Banner(DrawStatusBar)
             .Tab("Spawners", DrawSpawnersIntro, first: true)
             .Tab("Chests", DrawChestsIntro, first: true)
