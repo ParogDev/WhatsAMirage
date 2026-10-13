@@ -460,7 +460,7 @@ if (getData != null) { var data = getData(); }
 
 ### Custom ImGui Settings UI
 
-This plugin uses a dedicated `MirageSettingsUi` class with amber/gold accent, 5 tabs (Spawners, Chests, Monsters, Paths, Arrow), and self-contained PillToggle/SliderInt/ColorPicker/SectionHeader widget primitives. See `MirageSettingsUi.cs` for the full implementation.
+The settings panel is drawn by `SettingsMenu.cs` (per-plugin copy of the scaffolding's `new-plugin/templates/SettingsMenu.template.cs`, `__HUD__` = ExileCore) from the `[Menu]` attributes: one tab per root `[Submenu]`, merged with `[MenuTab]` (Spawners+Djinn Portals, Chests, Monsters, Paths, Arrow+General, Wishes+Varashta), `[MenuUnit]` slider units, `[Menu(..., index, parentIndex)]` nesting. `MirageSettingsUi` builds it (amber/gold accent) and adds what it can't know: the live count strip (`.Banner`), per tab an explanation, status lines, colour legends, Radar bridge status and the arrow preview (`.Tab(..., first: true)`), and a Wish Tiers tab (searchable tier reference, click a row to flag a wish).
 
 ### UI-First Feature Development
 
