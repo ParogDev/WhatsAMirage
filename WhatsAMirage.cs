@@ -10,7 +10,7 @@ using ExileCore.PoEMemory.MemoryObjects;
 using ExileCore.Shared.Enums;
 using ExileCore.Shared.Helpers;
 using GameOffsets.Native;
-using ImGuiNET;
+using Hexa.NET.ImGui;
 using Newtonsoft.Json;
 using Color = SharpDX.Color;
 using Vector2 = System.Numerics.Vector2;
