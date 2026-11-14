@@ -62,6 +62,10 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
     private Vector2 _mapCenter;
 
     private const float CameraAngle = 38.7f * MathF.PI / 180;
+
+    // ImGui 1.93 draws frames inside their rect by default; StrokeLegacy keeps the 1.90 centred stroke these frames were sized for.
+    private const int LegacyStroke = (int)ImDrawFlags.StrokeLegacy;
+
     private static readonly float CameraAngleCos = MathF.Cos(CameraAngle);
     private static readonly float CameraAngleSin = MathF.Sin(CameraAngle);
 
@@ -749,7 +753,7 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
                 var glowColor = new Color(flagColor.R, flagColor.G, flagColor.B, glowAlpha);
                 var cardMin = new Vector2(cardRect.X - 3, cardRect.Y - 3);
                 var cardMax = new Vector2(cardRect.X + cardRect.Width + 3, cardRect.Y + cardRect.Height + 3);
-                Graphics.DrawFrame(cardMin, cardMax, glowColor, 3);
+                Graphics.DrawFrame(cardMin, cardMax, glowColor, 0f, 3, LegacyStroke);
                 Graphics.DrawBox(cardMin, cardMax, new Color(flagColor.R, flagColor.G, flagColor.B, (byte)(30 + (int)(20 * pulse))));
             }
 
@@ -757,7 +761,8 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
             var scale = isFlagged ? 2.2f : 1.8f;
             using (Graphics.SetTextScale(scale))
             {
-                var textSize = Graphics.MeasureText(tierText);
+                Vector2 textSize;
+                using (Graphics.UseCurrentFont()) textSize = Graphics.MeasureText(tierText); // the font DrawText uses
                 var padding = new Vector2(10, 6);
                 var badgeCenter = new Vector2(
                     cardRect.X + cardRect.Width - textSize.X / 2 - padding.X - 8,
@@ -769,7 +774,7 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
                 var bgColor = isFlagged ? new Color(flagColor.R / 4, flagColor.G / 4, flagColor.B / 4, 240) : new Color(10, 10, 15, 220);
                 var frameColor = isFlagged ? flagColor : tierColor;
                 Graphics.DrawBox(pillMin, pillMax, bgColor);
-                Graphics.DrawFrame(pillMin, pillMax, frameColor, isFlagged ? 3 : 2);
+                Graphics.DrawFrame(pillMin, pillMax, frameColor, 0f, isFlagged ? 3 : 2, LegacyStroke);
 
                 Graphics.DrawText(tierText, badgeCenter, isFlagged ? flagColor : tierColor, FontAlign.Center);
             }
@@ -779,7 +784,8 @@ public class WhatsAMirage : BaseSettingsPlugin<WhatsAMirageSettings>
             {
                 using (Graphics.SetTextScale(1.4f))
                 {
-                    var pickSize = Graphics.MeasureText("PICK");
+                    Vector2 pickSize;
+                    using (Graphics.UseCurrentFont()) pickSize = Graphics.MeasureText("PICK"); // the font DrawText uses
                     var pickPos = new Vector2(
                         cardRect.X + cardRect.Width - pickSize.X / 2 - 18,
                         cardRect.Y + 4);
